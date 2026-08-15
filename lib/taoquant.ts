@@ -3,10 +3,10 @@
 export interface Subnet {
   id: number
   name: string
-  apy: number // average annualized return %
+  apy: number | null // average annualized return %, null when unavailable
   cv: number // coefficient of variation (volatility), typically 0..1+
   hhi: number // Herfindahl-Hirschman staking concentration, 0..1
-  churn: number // miner churn rate %, 0..100
+  churn: number | null // miner churn rate %, null when unavailable
 }
 
 export interface Weights {
@@ -32,8 +32,8 @@ export function computePillars(s: Subnet): Pillars {
     // CV > 1.0 => 1 - CV goes negative => Math.max(0, ...) floors it at 0
     stability: Math.max(0, 1 - s.cv),
     decentralization: clamp01(1 - s.hhi),
-    // churn is a percentage (0..100); churn > 100 => floored at 0
-    efficiency: Math.max(0, 1 - s.churn / 100),
+    // Missing churn is neutral for scoring; an explicit zero remains zero.
+    efficiency: s.churn === null ? 0 : Math.max(0, 1 - s.churn / 100),
   }
 }
 
@@ -113,6 +113,15 @@ function bounded(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
 
+export function formatAPY(apy: number | null): string {
+  if (apy === null || !Number.isFinite(apy)) return "N/A"
+  if (Math.abs(apy) > 10_000) return "N/A / Volatile"
+  const capped = bounded(apy, -999.9, 999.9)
+  if (Math.abs(capped) < 0.01) return `${capped.toFixed(3)}%`
+  if (Math.abs(capped) < 1) return `${capped.toFixed(2)}%`
+  return `${capped.toFixed(1)}%`
+}
+
 // Taostats' latest subnet endpoint currently exposes chain parameters rather
 // than the dashboard's derived metrics. Prefer explicit metric fields, then
 // derive useful non-zero fallbacks from the available subnet parameters.
@@ -144,7 +153,7 @@ export function mapData(raw: unknown): Subnet[] {
       // emission fraction as a per-block rate and annualizes it.
       const apy = emission ?? (projectedEmission !== undefined
         ? projectedEmission * 2_102_400 * 100
-        : 0)
+        : null)
       const cv = firstNumber(record, ["cv", "coefficient_of_variation", "coefficient_variation", "volatility"])
         ?? (activeMiners !== undefined && activeValidators !== undefined && activeMiners > 0
           ? bounded(activeValidators / activeMiners, 0, 1)
@@ -156,15 +165,15 @@ export function mapData(raw: unknown): Subnet[] {
       const churn = registrations
         ?? (activeMiners !== undefined && activeMiners > 0
           ? bounded((firstNumber(record, ["neuron_registrations_this_interval", "registrations_this_interval"]) ?? 0) / activeMiners * 100, 0, 100)
-          : 0)
+          : null)
 
       return {
         id,
         name: String(record.name ?? record.subnet_name ?? `Subnet ${id}`),
-        apy: Number.isFinite(apy) ? apy : 0,
+        apy: typeof apy === "number" && Number.isFinite(apy) ? apy : null,
         cv: bounded(cv, 0, 1),
         hhi: bounded(hhi, 0, 1),
-        churn: bounded(churn, 0, 100),
+        churn: typeof churn === "number" && Number.isFinite(churn) ? bounded(churn, 0, 100) : null,
       }
     })
     .filter((subnet): subnet is Subnet => subnet !== null)

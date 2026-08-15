@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, ChevronsUpDown, Database, Radio } from "lucide-reac
 import type { Dict } from "@/lib/i18n"
 import {
   computeIRA,
+  formatAPY,
   type DataSource,
   riskLevel,
   type Subnet,
@@ -233,7 +234,7 @@ export function SubnetTable({
                   </div>
                 </td>
                 <td className="px-3 py-3.5 text-right font-mono tabular-nums text-neon-green">
-                  {s.apy.toFixed(1)}%
+                  {formatAPY(s.apy)}
                 </td>
                 <td className="px-3 py-3.5 text-right font-mono tabular-nums text-muted-foreground">
                   {s.cv.toFixed(2)}
@@ -242,7 +243,7 @@ export function SubnetTable({
                   {s.hhi.toFixed(2)}
                 </td>
                 <td className="px-3 py-3.5 text-right font-mono tabular-nums text-muted-foreground">
-                  {s.churn.toFixed(0)}%
+                  {s.churn === null ? "N/A" : `${s.churn.toFixed(0)}%`}
                 </td>
                 <td className="px-3 py-3.5 text-right">
                   <IraBadge ira={s.ira} t={t} />
