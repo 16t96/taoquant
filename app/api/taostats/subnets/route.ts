@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const TAOSTATS_ENDPOINT = "https://api.taostats.io/v1/subnets"
+const TAOSTATS_ENDPOINT = "https://api.taostats.io/api/subnet/latest/v1"
 
 export async function GET() {
   const apiKey = process.env.NEXT_PUBLIC_TAOSTATS_API_KEY ?? process.env.TAOSTATS_API_KEY
@@ -13,7 +13,8 @@ export async function GET() {
     const response = await fetch(TAOSTATS_ENDPOINT, {
       headers: {
         Accept: "application/json",
-        Authorization: `Bearer ${apiKey}`,
+        // Taostats expects the API key value directly in Authorization.
+        Authorization: apiKey,
         "x-api-key": apiKey,
       },
       cache: "no-store",

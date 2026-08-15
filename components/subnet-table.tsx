@@ -90,12 +90,14 @@ export function SubnetTable({
   weights,
   source,
   onSourceChange,
+  liveError,
   t,
 }: {
   subnets: Subnet[]
   weights: Weights
   source: DataSource
   onSourceChange: (s: DataSource) => void
+  liveError: boolean
   t: Dict
 }) {
   const [sortKey, setSortKey] = useState<SortKey>("ira")
@@ -163,9 +165,9 @@ export function SubnetTable({
         </div>
       </div>
 
-      {source === "live" && (
+      {source === "live" && liveError && (
         <p className="border-b border-border bg-warn/10 px-5 py-2 font-mono text-xs text-warn md:px-6">
-          {t.table.liveSoon}
+          {t.table.liveError}
         </p>
       )}
 
