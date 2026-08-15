@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import { useEffect, useState } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { ParamsPanel } from "@/components/params-panel"
@@ -49,6 +50,25 @@ export default function Page() {
   return (
     <main className="min-h-dvh">
       <SiteHeader lang={lang} onLangChange={setLang} t={t} />
+
+      <section className="relative isolate overflow-hidden border-b border-border/60" aria-label="TAOQuant analytics banner">
+        <Image
+          src="/taoquant-banner.png"
+          alt="Isometric TAOQuant Web3 analytics dashboard with risk gauges and performance charts"
+          width={1920}
+          height={1080}
+          priority
+          className="h-64 w-full object-cover object-center opacity-80 md:h-80 lg:h-96"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-background via-background/75 to-transparent" />
+        <div className="absolute inset-y-0 left-0 flex max-w-2xl items-center px-6 py-8 md:px-12">
+          <div>
+            <p className="mb-2 font-mono text-xs uppercase tracking-[0.28em] text-neon-cyan">Bittensor analytics</p>
+            <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground md:text-5xl">TAOQuant</h1>
+            <p className="mt-3 max-w-lg text-pretty text-sm leading-6 text-muted-foreground md:text-base">Deterministic subnet intelligence, risk scoring, and APY stability analysis in one auditable workspace.</p>
+          </div>
+        </div>
+      </section>
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-8 md:px-6 md:py-10">
         <section id="ira-model" className="scroll-mt-6">
