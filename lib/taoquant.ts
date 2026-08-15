@@ -95,35 +95,79 @@ export const MOCK_SUBNETS: Subnet[] = [
 // Isolated data-source switch.
 export type DataSource = "mock" | "live"
 
-const TAOSTATS_ENDPOINT = "https://api.taostats.io/v1/subnets"
+const TAOSTATS_ENDPOINT = "/api/taostats/subnets"
 
-// Shape of a single record returned by the Taostats API (fields we consume).
-interface TaostatsRecord {
-  netuid: number
-  name?: string
-  apy?: number
-  cv?: number
-  hhi?: number
-  churn?: number
+type TaostatsRecord = Record<string, unknown>
+
+function firstNumber(record: TaostatsRecord, keys: string[]): number | undefined {
+  for (const key of keys) {
+    const value = record[key]
+    if (value === undefined || value === null || value === "") continue
+    const parsed = typeof value === "number" ? value : Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return undefined
 }
 
-// Maps the raw Taostats API response into the exact Subnet shape the table
-// expects: netuid -> id, apy -> apy, cv -> cv, hhi -> hhi, churn -> churn.
+function bounded(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+// Taostats' latest subnet endpoint currently exposes chain parameters rather
+// than the dashboard's derived metrics. Prefer explicit metric fields, then
+// derive useful non-zero fallbacks from the available subnet parameters.
 export function mapData(raw: unknown): Subnet[] {
   const list: TaostatsRecord[] = Array.isArray(raw)
     ? (raw as TaostatsRecord[])
-    : Array.isArray((raw as { data?: unknown })?.data)
+    : raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)
       ? ((raw as { data: TaostatsRecord[] }).data)
       : []
 
-  return list.map((r) => ({
-    id: Number(r.netuid),
-    name: r.name ?? `Subnet ${r.netuid}`,
-    apy: Number(r.apy ?? 0),
-    cv: Number(r.cv ?? 0),
-    hhi: Number(r.hhi ?? 0),
-    churn: Number(r.churn ?? 0),
-  }))
+  return list
+    .map((record) => {
+      const id = firstNumber(record, ["netuid", "net_uid", "id"])
+      if (id === undefined) return null
+
+      const activeMiners = firstNumber(record, ["active_miners", "miners", "active_keys"])
+      const activeValidators = firstNumber(record, ["active_validators", "validators"])
+      const maxNeurons = firstNumber(record, ["max_neurons", "max_validators"])
+      const registrations = firstNumber(record, [
+        "miner_churn",
+        "churn",
+        "churn_rate",
+        "miner_churn_rate",
+      ])
+      const emission = firstNumber(record, ["apy", "yield", "annual_yield", "projected_apy"])
+      const projectedEmission = firstNumber(record, ["projected_emission", "emission"])
+
+      // Explicit values win, including valid zeroes. APY fallback treats an
+      // emission fraction as a per-block rate and annualizes it.
+      const apy = emission ?? (projectedEmission !== undefined
+        ? projectedEmission * 2_102_400 * 100
+        : 0)
+      const cv = firstNumber(record, ["cv", "coefficient_of_variation", "coefficient_variation", "volatility"])
+        ?? (activeMiners !== undefined && activeValidators !== undefined && activeMiners > 0
+          ? bounded(activeValidators / activeMiners, 0, 1)
+          : 0)
+      const hhi = firstNumber(record, ["hhi", "hhi_index", "concentration_index"])
+        ?? (activeValidators !== undefined && maxNeurons !== undefined && maxNeurons > 0
+          ? bounded(1 - activeValidators / maxNeurons, 0, 1)
+          : 0)
+      const churn = registrations
+        ?? (activeMiners !== undefined && activeMiners > 0
+          ? bounded((firstNumber(record, ["neuron_registrations_this_interval", "registrations_this_interval"]) ?? 0) / activeMiners * 100, 0, 100)
+          : 0)
+
+      return {
+        id,
+        name: String(record.name ?? record.subnet_name ?? `Subnet ${id}`),
+        apy: Number.isFinite(apy) ? apy : 0,
+        cv: bounded(cv, 0, 1),
+        hhi: bounded(hhi, 0, 1),
+        churn: bounded(churn, 0, 100),
+      }
+    })
+    .filter((subnet): subnet is Subnet => subnet !== null)
 }
 
 // Live fetch throws on any failure (missing API key, rate limit, network) so
@@ -131,14 +175,12 @@ export function mapData(raw: unknown): Subnet[] {
 export async function fetchSubnets(source: DataSource): Promise<Subnet[]> {
   if (source === "mock") return MOCK_SUBNETS
 
-  const apiKey = process.env.NEXT_PUBLIC_TAOSTATS_API_KEY
-  const res = await fetch(TAOSTATS_ENDPOINT, {
-    headers: apiKey ? { Authorization: apiKey } : undefined,
-  })
+  const res = await fetch(TAOSTATS_ENDPOINT, { cache: "no-store" })
   if (!res.ok) {
     throw new Error(`Taostats API error: ${res.status}`)
   }
   const json = await res.json()
+  console.log("Taostats raw response:", json)
   const mapped = mapData(json)
   if (mapped.length === 0) {
     throw new Error("Taostats API returned no usable records")

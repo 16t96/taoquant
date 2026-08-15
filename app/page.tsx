@@ -24,21 +24,27 @@ export default function Page() {
   const [weights, setWeights] = useState<Weights>(DEFAULT_WEIGHTS)
   const [source, setSource] = useState<DataSource>("mock")
   const [subnets, setSubnets] = useState<Subnet[]>(MOCK_SUBNETS)
+  const [liveError, setLiveError] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   const t = translations[lang]
 
   useEffect(() => {
     let active = true
+    if (source === "live") setLiveError(false)
     fetchSubnets(source)
       .then((data) => {
-        if (active) setSubnets(data)
+        if (active) {
+          setSubnets(data)
+          setLiveError(false)
+        }
       })
       .catch(() => {
         if (!active) return
         // Gracefully keep the mock data on screen and surface the error.
         setSubnets(MOCK_SUBNETS)
         setSource("mock")
+        setLiveError(true)
         setToast(t.table.liveError)
       })
     return () => {
@@ -79,7 +85,11 @@ export default function Page() {
             subnets={subnets}
             weights={weights}
             source={source}
-            onSourceChange={setSource}
+              onSourceChange={(nextSource) => {
+                setLiveError(false)
+                setSource(nextSource)
+              }}
+            liveError={liveError}
             t={t}
           />
         </section>
