@@ -27,8 +27,7 @@ export const translations = {
       sourceMock: "Local mock dataset (no requests spent)",
       sourceLive: "api.taostats.io/v1/subnets",
       liveSoon: "Live fetch is stubbed — using mock data as fallback.",
-      liveError:
-        "Could not reach the Taostats API (missing API key or rate limit). Showing mock data.",
+      liveError: "Using Cached/Mock Data — Taostats Live API unavailable.",
       cols: {
         subnet: "Subnet",
         apy: "Avg Return (APY)",
@@ -133,8 +132,7 @@ export const translations = {
       sourceMock: "Conjunto de dados local (sem gastar requisições)",
       sourceLive: "api.taostats.io/v1/subnets",
       liveSoon: "Busca ao vivo é um stub — usando dados mock como fallback.",
-      liveError:
-        "Não foi possível acessar a API da Taostats (falta de API Key ou limite de requisições). Exibindo dados mock.",
+      liveError: "Usando Dados em Cache/Mock — API ao vivo da Taostats indisponível.",
       cols: {
         subnet: "Sub-rede",
         apy: "Retorno Médio (APY)",
