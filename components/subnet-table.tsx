@@ -166,8 +166,8 @@ export function SubnetTable({
         </div>
       </div>
 
-      {source === "live" && liveError && (
-        <p className="border-b border-border bg-warn/10 px-5 py-2 font-mono text-xs text-warn md:px-6">
+      {liveError && (
+        <p className="border-b border-border bg-warn/10 px-5 py-2 font-mono text-xs text-warn md:px-6" role="status">
           {t.table.liveError}
         </p>
       )}

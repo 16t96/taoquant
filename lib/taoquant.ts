@@ -115,11 +115,9 @@ function bounded(value: number, min: number, max: number) {
 
 export function formatAPY(apy: number | null): string {
   if (apy === null || !Number.isFinite(apy)) return "-"
-  if (Math.abs(apy) > 1_000) return "N/A / Volatile"
-  const capped = bounded(apy, -999.9, 999.9)
-  if (Math.abs(capped) < 0.01) return `${capped.toFixed(3)}%`
-  if (Math.abs(capped) < 1) return `${capped.toFixed(2)}%`
-  return `${capped.toFixed(1)}%`
+  if (Math.abs(apy) > 1_000) return "Volatile"
+  if (Math.abs(apy) < 0.01) return "< 0.01%"
+  return `${apy.toFixed(apy < 10 ? 2 : 1)}%`
 }
 
 // Taostats' latest subnet endpoint currently exposes chain parameters rather
@@ -146,14 +144,15 @@ export function mapData(raw: unknown): Subnet[] {
         "churn_rate",
         "miner_churn_rate",
       ])
-      const directYield = firstNumber(record, ["apy", "yield_24h", "yield", "annual_yield", "projected_apy"])
+      const directYield = firstNumber(record, ["yield", "apy", "roi", "return_rate"])
       const dailyEmission = firstNumber(record, ["daily_emission", "emission_24h"])
       const emission = dailyEmission ?? firstNumber(record, ["emission"])
       const stake = firstNumber(record, ["tao_in", "total_stake", "stake", "total_stake_tao", "alpha_in"])
       const projectedEmission = firstNumber(record, ["projected_emission"])
+      const emissionRate = firstNumber(record, ["emission_rate", "emission_ratio"])
 
-      // API yields are commonly fractions (0.125 = 12.5%). Emission-based
-      // APY is estimated against subnet stake; if stake is absent, stay null.
+      // Yield fields may be ratios (0.14 => 14%) or already percentages.
+      // Emission fallbacks require a stake denominator; otherwise APY stays null.
       const normalizePercent = (value: number) => Math.abs(value) > 0 && Math.abs(value) < 1 ? value * 100 : value
       const directApy = directYield === undefined ? undefined : normalizePercent(directYield)
       const emissionApy = emission !== undefined && stake !== undefined && stake > 0
@@ -162,7 +161,8 @@ export function mapData(raw: unknown): Subnet[] {
       const projectedApy = projectedEmission !== undefined && stake !== undefined && stake > 0
         ? (projectedEmission / stake) * 365 * 100
         : undefined
-      const apy = directApy ?? emissionApy ?? projectedApy ?? null
+      const rateApy = emissionRate === undefined ? undefined : normalizePercent(emissionRate) * 365
+      const apy = directApy ?? emissionApy ?? projectedApy ?? rateApy ?? null
       const cv = firstNumber(record, ["cv", "coefficient_of_variation", "coefficient_variation", "volatility"])
         ?? (activeMiners !== undefined && activeValidators !== undefined && activeMiners > 0
           ? bounded(activeValidators / activeMiners, 0, 1)
