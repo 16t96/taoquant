@@ -95,7 +95,7 @@ export const MOCK_SUBNETS: Subnet[] = [
 // Isolated data-source switch.
 export type DataSource = "mock" | "live"
 
-const TAOSTATS_ENDPOINT = "/api/taostats/subnets"
+const TAOSTATS_ENDPOINT = "/api/taostats"
 
 type TaostatsRecord = Record<string, unknown>
 
