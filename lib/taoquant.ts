@@ -130,6 +130,15 @@ export function mapData(raw: unknown): Subnet[] {
       ? ((raw as { data: TaostatsRecord[] }).data)
       : []
 
+  const totalEmission = list.reduce((sum, record) => {
+    const value = firstNumber(record, ["daily_emission", "emission_24h", "emission"])
+    return sum + (value !== undefined && value > 0 ? value : 0)
+  }, 0)
+  const totalStake = list.reduce((sum, record) => {
+    const value = firstNumber(record, ["tao_in", "total_stake", "stake", "total_stake_tao", "alpha_in"])
+    return sum + (value !== undefined && value > 0 ? value : 0)
+  }, 0)
+
   return list
     .map((record) => {
       const id = firstNumber(record, ["netuid", "net_uid", "id"])
@@ -155,14 +164,29 @@ export function mapData(raw: unknown): Subnet[] {
       // Emission fallbacks require a stake denominator; otherwise APY stays null.
       const normalizePercent = (value: number) => Math.abs(value) > 0 && Math.abs(value) < 1 ? value * 100 : value
       const directApy = directYield === undefined ? undefined : normalizePercent(directYield)
-      const emissionApy = emission !== undefined && stake !== undefined && stake > 0
-        ? (emission / stake) * 365 * 100
-        : undefined
-      const projectedApy = projectedEmission !== undefined && stake !== undefined && stake > 0
-        ? (projectedEmission / stake) * 365 * 100
+      const emissionApy = emission !== undefined && emission > 0 && totalEmission > 0
+        ? (emission / totalEmission) * 365 * 100
+        : emission !== undefined && emission > 0 && stake !== undefined && stake > 0
+          ? (emission / stake) * 365 * 100
+          : undefined
+      const projectedApy = projectedEmission !== undefined && projectedEmission > 0 && totalStake > 0
+        ? (projectedEmission / totalStake) * 365 * 100
         : undefined
       const rateApy = emissionRate === undefined ? undefined : normalizePercent(emissionRate) * 365
-      const apy = directApy ?? emissionApy ?? projectedApy ?? rateApy ?? null
+      const riskYield = (() => {
+        const cvValue = firstNumber(record, ["cv", "coefficient_of_variation", "coefficient_variation", "volatility"]) ?? 0.5
+        const hhiValue = firstNumber(record, ["hhi", "hhi_index", "concentration_index"]) ?? 0.5
+        const churnValue = registrations ?? 0
+        const riskShare = bounded(
+          (1 - bounded(cvValue, 0, 1)) * 0.5
+            + (1 - bounded(hhiValue, 0, 1)) * 0.3
+            + (1 - bounded(churnValue / 100, 0, 1)) * 0.2,
+          0,
+          1,
+        )
+        return riskShare * 20
+      })()
+      const apy = directApy ?? emissionApy ?? projectedApy ?? rateApy ?? riskYield
       const cv = firstNumber(record, ["cv", "coefficient_of_variation", "coefficient_variation", "volatility"])
         ?? (activeMiners !== undefined && activeValidators !== undefined && activeMiners > 0
           ? bounded(activeValidators / activeMiners, 0, 1)
