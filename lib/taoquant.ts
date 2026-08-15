@@ -95,7 +95,7 @@ export const MOCK_SUBNETS: Subnet[] = [
 // Isolated data-source switch.
 export type DataSource = "mock" | "live"
 
-const TAOSTATS_ENDPOINT = "https://api.taostats.io/v1/subnets"
+const TAOSTATS_ENDPOINT = "/api/taostats/subnets"
 
 // Shape of a single record returned by the Taostats API (fields we consume).
 interface TaostatsRecord {
@@ -131,10 +131,7 @@ export function mapData(raw: unknown): Subnet[] {
 export async function fetchSubnets(source: DataSource): Promise<Subnet[]> {
   if (source === "mock") return MOCK_SUBNETS
 
-  const apiKey = process.env.NEXT_PUBLIC_TAOSTATS_API_KEY
-  const res = await fetch(TAOSTATS_ENDPOINT, {
-    headers: apiKey ? { Authorization: apiKey } : undefined,
-  })
+  const res = await fetch(TAOSTATS_ENDPOINT, { cache: "no-store" })
   if (!res.ok) {
     throw new Error(`Taostats API error: ${res.status}`)
   }
